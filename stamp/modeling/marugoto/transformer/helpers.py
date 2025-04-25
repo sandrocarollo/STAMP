@@ -197,7 +197,7 @@ def deploy_categorical_model_(
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if device.type == "cuda":
         # allow for usage of TensorFloat32 as internal dtype for matmul on modern NVIDIA GPUs
-        torch.set_float32_matmul_precision("high")
+        torch.set_float32_matmul_precision("medium")
     
     use_cpu= (device.type == "cpu") # True or False
     
@@ -245,14 +245,18 @@ def categorical_crossval_(
         categories:  Categories to train for, or all categories appearing in the
             clini table if none given (e.g. '["MSIH", "nonMSIH"]').
     """
-    feature_dir = Path(feature_dir)
-    output_path = Path(output_path)
-    output_path.mkdir(exist_ok=True, parents=True)
+    use_cpu=True
 
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
     if device.type == "cuda":
         # allow for usage of TensorFloat32 as internal dtype for matmul on modern NVIDIA GPUs
-        torch.set_float32_matmul_precision("high")
+        torch.set_float32_matmul_precision("medium")
+
+    use_cpu= (device.type == "cpu") # True or False
+
+    feature_dir = Path(feature_dir)
+    output_path = Path(output_path)
+    output_path.mkdir(exist_ok=True, parents=True)
 
     # just a big fat object to dump all kinds of info into for later reference
     # not used during actual training
@@ -323,7 +327,7 @@ def categorical_crossval_(
             print(f'{preds_csv} already exists!  Skipping...')
             continue
         elif (fold_path/'export.pkl').exists():
-            learn = safe_load_learner(fold_path/'export.pkl')
+            learn = safe_load_learner(fold_path/'export.pkl', use_cpu=use_cpu)
         else:
             fold_train_df = df.iloc[train_idxs]
             learn = _crossval_train(

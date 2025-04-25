@@ -25,8 +25,9 @@ from .helpers import stainNorm_Macenko
 from .helpers.common import supported_extensions
 from .helpers.concurrent_canny_rejection import reject_background
 from .helpers.loading_slides import process_slide_jpg, load_slide, get_raw_tile_list
-from .helpers.feature_extractors import FeatureExtractorCTP, FeatureExtractorUNI, extract_features_
+from .helpers.feature_extractors import FeatureExtractorCTP, FeatureExtractorChiefCTP, FeatureExtractorUNI, FeatureExtractorUNI2, FeatureExtractorHOptimus0, FeatureExtractorHOptimus1, extract_features_
 from .helpers.exceptions import MPPExtractionError
+from .helpers.feature_extractors import FeatureExtractorVirchow, FeatureExtractorVirchow2
 
 
 PIL.Image.MAX_IMAGE_PIXELS = None
@@ -81,8 +82,20 @@ def preprocess(output_dir: Path, wsi_dir: Path, model_path: Path, cache_dir: Pat
     print(f"Initialising feature extractor {feat_extractor}...")
     if feat_extractor == "ctp":
         extractor = FeatureExtractorCTP(checkpoint_path=model_path)
+    elif feat_extractor == "chief-ctp":
+        extractor = FeatureExtractorChiefCTP(checkpoint_path=model_path)
     elif feat_extractor == "uni":
         extractor = FeatureExtractorUNI()
+    elif feat_extractor == "uni2":
+        extractor = FeatureExtractorUNI2()
+    elif feat_extractor == "virchow":
+        extractor = FeatureExtractorVirchow()
+    elif feat_extractor == "virchow2":
+        extractor = FeatureExtractorVirchow2()
+    elif feat_extractor == "hoptimus0":
+        extractor = FeatureExtractorHOptimus0()
+    elif feat_extractor == "hoptimus1":
+        extractor = FeatureExtractorHOptimus1()
     else:
         raise Exception(f"Invalid feature extractor '{feat_extractor}' selected")
 

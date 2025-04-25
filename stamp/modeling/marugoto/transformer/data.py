@@ -312,6 +312,9 @@ def get_cohort_df(
     if 'FILENAME' in clini_df.columns and 'FILENAME' in slide_df.columns:
         clini_df = clini_df.drop(columns=['FILENAME'])
     
+    # Ensure FILENAME column in slide_df has consistent format (remove .h5 if present)
+    slide_df['FILENAME'] = slide_df['FILENAME'].str.replace('.h5', '', regex=False)
+
     df = clini_df.merge(slide_df, on='PATIENT')
     # remove uninteresting
     df = df[df[target_label].isin(categories)]

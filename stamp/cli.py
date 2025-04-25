@@ -5,34 +5,18 @@ from pathlib import Path
 import os
 from typing import Iterable, Optional
 import shutil
+import timm 
+import torch 
 
-NORMALIZATION_TEMPLATE_URL = "https://github.com/KatherLab/STAMP/blob/v1/resources/normalization_template.jpg?raw=true"
+NORMALIZATION_TEMPLATE_URL = "https://github.com/sandrocarollo/STAMP/blob/v1/resources/normalization_template.jpg?raw=true"
 CTRANSPATH_WEIGHTS_URL = "https://drive.google.com/u/0/uc?id=1DoDx_70_TLj98gTf6YTXnu4tFhsFocDX&export=download"
+CHIEF_WEIGHTS_URL = "https://drive.google.com/uc?id=1_vgRF1QXa8sPCOpJ1S9BihwZhXQMOVJc&export=download"
 DEFAULT_RESOURCES_DIR = Path(__file__).with_name("resources")
 DEFAULT_CONFIG_FILE = Path("config.yaml")
 STAMP_FACTORY_SETTINGS = Path(__file__).with_name("config.yaml")
 
 class ConfigurationError(Exception):
     pass
-
-def check_path_exists(path):
-    directories = path.split(os.path.sep)
-    current_path = os.path.sep
-    for directory in directories:
-        current_path = os.path.join(current_path, directory)
-        if not os.path.exists(current_path):
-            return False, directory
-    return True, None
-
-
-def check_and_handle_path(path, path_key, prefix):
-    exists, directory = check_path_exists(path)
-    if not exists:
-        print(f"From input path: '{path}'")
-        print(f"Directory '{directory}' does not exist.")
-        print(f"Check the input path of '{path_key}' from the '{prefix}' section.")
-        raise SystemExit(f"Stopping {prefix} due to faulty user input...")
-
 
 def _config_has_key(cfg: DictConfig, key: str):
     try:
@@ -44,27 +28,12 @@ def _config_has_key(cfg: DictConfig, key: str):
         return False
     return True
 
-def require_configs(cfg: DictConfig, keys: Iterable[str], prefix: Optional[str] = None,
-                    paths_to_check: Iterable[str] = []):
-    keys = [f"{prefix}.{k}" for k in keys]
+def require_configs(cfg: DictConfig, keys: Iterable[str], prefix: Optional[str] = None):
+    prefix = f"{prefix}." if prefix else ""
+    keys = [f"{prefix}{k}" for k in keys]
     missing = [k for k in keys if not _config_has_key(cfg, k)]
     if len(missing) > 0:
         raise ConfigurationError(f"Missing required configuration keys: {missing}")
-
-    # Check if paths exist
-    for path_key in paths_to_check:
-        try:
-            #for all but modeling.statistics
-            path = cfg[prefix][path_key]
-        except:
-            #for modeling.statistics, handling the pred_csvs
-            path = OmegaConf.select(cfg, f"{prefix}.{path_key}")
-        if isinstance(path, ListConfig):
-            for p in path:
-                check_and_handle_path(p, path_key, prefix)
-        else:
-            check_and_handle_path(path, path_key, prefix)
-
 
 def create_config_file(config_file: Optional[Path]):
     """Create a new config file at the specified path (by copying the default config file)."""
@@ -123,8 +92,20 @@ def run_cli(args: argparse.Namespace):
             feat_extractor = cfg.preprocessing.feat_extractor
             if feat_extractor == 'ctp':
                 model_path = Path(f"{os.environ['STAMP_RESOURCES_DIR']}/ctranspath.pth")
+            elif feat_extractor == 'chief-ctp':
+                model_path = Path(f"{os.environ['STAMP_RESOURCES_DIR']}/chief-ctp.pth")
             elif feat_extractor == 'uni':
                 model_path = Path(f"{os.environ['STAMP_RESOURCES_DIR']}/uni/vit_large_patch16_224.dinov2.uni_mass100k/pytorch_model.bin")
+            elif feat_extractor == 'uni2':
+                model_path = Path(f"{os.environ['STAMP_RESOURCES_DIR']}/uni2/uni2-h/pytorch_model.bin")
+            elif feat_extractor == 'virchow':
+                model_path = Path(f"{os.environ['STAMP_RESOURCES_DIR']}/virchow/pytorch_model.bin")
+            elif feat_extractor == 'virchow2':
+                model_path = Path(f"{os.environ['STAMP_RESOURCES_DIR']}/virchow2/pytorch_model.bin")
+            elif feat_extractor == 'hoptimus0':
+                model_path = Path(f"{os.environ['STAMP_RESOURCES_DIR']}/hoptimus0/pytorch_model.bin")
+            elif feat_extractor == 'hoptimus1':
+                model_path = Path(f"{os.environ['STAMP_RESOURCES_DIR']}/hoptimus1/pytorch_model.bin")
             model_path.parent.mkdir(parents=True, exist_ok=True)
             if model_path.exists():
                 print(f"Skipping download, feature extractor model already exists at {model_path}")
@@ -133,18 +114,99 @@ def run_cli(args: argparse.Namespace):
                     print(f"Downloading CTransPath weights to {model_path}")
                     import gdown
                     gdown.download(CTRANSPATH_WEIGHTS_URL, str(model_path))
+                elif feat_extractor == 'chief-ctp':
+                    print(f"Downloading CHIEF weights to {model_path}")
+                    import gdown
+                    gdown.download(CHIEF_WEIGHTS_URL, str(model_path))
                 elif feat_extractor == 'uni':
                     print(f"Downloading UNI weights")
                     from uni.get_encoder import get_encoder
                     get_encoder(enc_name='uni', checkpoint='pytorch_model.bin', assets_dir=f"{os.environ['STAMP_RESOURCES_DIR']}/uni")
+                elif feat_extractor == 'uni2':
+                    print(f"Downloading UNI2 weights")
+                    from uni.get_encoder import get_encoder
+                    get_encoder(enc_name='uni2-h', checkpoint='pytorch_model.bin', assets_dir=f"{os.environ['STAMP_RESOURCES_DIR']}/uni2")
+                elif feat_extractor == 'virchow':
+                    print("Downloading Virchow weights")
+                    assets_dir = f"{os.environ['STAMP_RESOURCES_DIR']}"
+
+                    from timm.layers import SwiGLUPacked
+                    # from huggingface_hub import login
+                    # login()
+
+                    model = timm.create_model("hf-hub:paige-ai/Virchow", pretrained=True, mlp_layer=SwiGLUPacked, act_layer=torch.nn.SiLU)
+
+                    model_name = 'virchow'
+                    checkpoint = 'pytorch_model.bin'
+
+                    ckpt_dir = os.path.join(assets_dir, model_name)
+                    ckpt_path = os.path.join(assets_dir, model_name, checkpoint)
+
+                    # Ensure the directory exists
+                    os.makedirs(ckpt_dir, exist_ok=True)
+
+                    # Save the model
+                    torch.save(model.state_dict(), ckpt_path)
+                elif feat_extractor == 'virchow2':
+                    print("Downloading Virchow2 weights")
+                    assets_dir = f"{os.environ['STAMP_RESOURCES_DIR']}"
+
+                    from timm.layers import SwiGLUPacked
+                    # from huggingface_hub import login
+                    # login()
+
+                    model = timm.create_model("hf-hub:paige-ai/Virchow2", pretrained=True, mlp_layer=SwiGLUPacked, act_layer=torch.nn.SiLU)
+                                        
+                    model_name = 'virchow2'
+                    checkpoint = 'pytorch_model.bin'
+
+                    ckpt_dir = os.path.join(assets_dir, model_name)
+                    ckpt_path = os.path.join(assets_dir, model_name, checkpoint)
+
+                    # Ensure the directory exists
+                    os.makedirs(ckpt_dir, exist_ok=True)
+
+                    # Save the model
+                    torch.save(model.state_dict(), ckpt_path)
+                elif feat_extractor == 'hoptimus0':
+                    print("Downloading H-optimus-0 weights")
+                    assets_dir = f"{os.environ['STAMP_RESOURCES_DIR']}"
+
+                    model = model = timm.create_model("hf-hub:bioptimus/H-optimus-0", pretrained=True, init_values=1e-5, dynamic_img_size=False)          
+                    model_name = 'hoptimus0'
+                    checkpoint = 'pytorch_model.bin'
+
+                    ckpt_dir = os.path.join(assets_dir, model_name)
+                    ckpt_path = os.path.join(assets_dir, model_name, checkpoint)
+
+                    # Ensure the directory exists
+                    os.makedirs(ckpt_dir, exist_ok=True)
+
+                    # Save the model
+                    torch.save(model.state_dict(), ckpt_path)
+                elif feat_extractor == 'hoptimus1':
+                    print("Downloading H-optimus-1 weights")
+                    assets_dir = f"{os.environ['STAMP_RESOURCES_DIR']}"
+
+                    model = model = timm.create_model("hf-hub:bioptimus/H-optimus-1", pretrained=True, init_values=1e-5, dynamic_img_size=False)          
+                    model_name = 'hoptimus1'
+                    checkpoint = 'pytorch_model.bin'
+
+                    ckpt_dir = os.path.join(assets_dir, model_name)
+                    ckpt_path = os.path.join(assets_dir, model_name, checkpoint)
+
+                    # Ensure the directory exists
+                    os.makedirs(ckpt_dir, exist_ok=True)
+
+                    # Save the model
+                    torch.save(model.state_dict(), ckpt_path)
         case "config":
             print(OmegaConf.to_yaml(cfg, resolve=True))
         case "preprocess":
             require_configs(
                 cfg,
                 ["output_dir", "wsi_dir", "cache_dir", "microns", "cores", "norm", "del_slide", "only_feature_extraction", "device", "feat_extractor"],
-                prefix="preprocessing",
-                paths_to_check=["wsi_dir"]
+                prefix="preprocessing"
             )
             c = cfg.preprocessing
             # Some checks
@@ -153,10 +215,24 @@ def run_cli(args: argparse.Namespace):
                 raise ConfigurationError(f"Normalization template {normalization_template_path} does not exist, please run `stamp setup` to download it.")
             if c.feat_extractor == 'ctp':
                 model_path = f"{os.environ['STAMP_RESOURCES_DIR']}/ctranspath.pth"
+            elif c.feat_extractor == 'chief-ctp':
+                model_path = f"{os.environ['STAMP_RESOURCES_DIR']}/chief-ctp.pth"
             elif c.feat_extractor == 'uni':
                 model_path = f"{os.environ['STAMP_RESOURCES_DIR']}/uni/vit_large_patch16_224.dinov2.uni_mass100k/pytorch_model.bin"
+            elif c.feat_extractor == 'uni2':
+                model_path = f"{os.environ['STAMP_RESOURCES_DIR']}/uni2/uni2-h/pytorch_model.bin"
+            elif c.feat_extractor == 'virchow':
+                model_path = f"{os.environ['STAMP_RESOURCES_DIR']}/virchow/pytorch_model.bin"
+            elif c.feat_extractor == 'virchow2':
+                model_path = f"{os.environ['STAMP_RESOURCES_DIR']}/virchow2/pytorch_model.bin"
+            elif c.feat_extractor == 'hoptimus0':
+                model_path = f"{os.environ['STAMP_RESOURCES_DIR']}/hoptimus0/pytorch_model.bin"
+            elif c.feat_extractor == 'hoptimus1':
+                model_path = f"{os.environ['STAMP_RESOURCES_DIR']}/hoptimus1/pytorch_model.bin"
+
             if not Path(model_path).exists():
                 raise ConfigurationError(f"Feature extractor model {model_path} does not exist, please run `stamp setup` to download it.")
+            
             from .preprocessing.wsi_norm import preprocess
             preprocess(
                 output_dir=Path(c.output_dir),
@@ -178,9 +254,8 @@ def run_cli(args: argparse.Namespace):
         case "train":
             require_configs(
                 cfg,
-                ["clini_table", "slide_table", "output_dir", "feature_dir", "target_label", "cat_labels", "cont_labels"],
-                prefix="modeling",
-                paths_to_check=["clini_table", "slide_table", "feature_dir"]
+                ["output_dir", "feature_dir", "target_label", "cat_labels", "cont_labels"],
+                prefix="modeling"
             )
             c = cfg.modeling
             from .modeling.marugoto.transformer.helpers import train_categorical_model_
@@ -195,9 +270,8 @@ def run_cli(args: argparse.Namespace):
         case "crossval":
             require_configs(
                 cfg,
-                ["clini_table", "slide_table", "output_dir", "feature_dir", "target_label", "cat_labels", "cont_labels", "n_splits"], # this one requires the n_splits key!
-                prefix="modeling",
-                paths_to_check=["clini_table", "slide_table", "feature_dir"]
+                ["output_dir", "feature_dir", "target_label", "cat_labels", "cont_labels", "n_splits"], # this one requires the n_splits key!
+                prefix="modeling"
             )
             c = cfg.modeling
             from .modeling.marugoto.transformer.helpers import categorical_crossval_
@@ -213,9 +287,8 @@ def run_cli(args: argparse.Namespace):
         case "deploy":
             require_configs(
                 cfg,
-                ["clini_table", "slide_table", "output_dir", "deploy_feature_dir", "target_label", "cat_labels", "cont_labels", "model_path"], # this one requires the model_path key!
-                prefix="modeling",
-                paths_to_check=["clini_table", "slide_table", "deploy_feature_dir"]
+                ["output_dir", "deploy_feature_dir", "target_label", "cat_labels", "cont_labels", "model_path"], # this one requires the model_path key!
+                prefix="modeling"
             )
             c = cfg.modeling
             from .modeling.marugoto.transformer.helpers import deploy_categorical_model_
@@ -232,8 +305,7 @@ def run_cli(args: argparse.Namespace):
             require_configs(
                 cfg,
                 ["pred_csvs", "target_label", "true_class", "output_dir"],
-                prefix="modeling.statistics",
-                paths_to_check=["pred_csvs"]
+                prefix="modeling.statistics"
             )
             from .modeling.statistics import compute_stats
             c = cfg.modeling.statistics
@@ -248,8 +320,7 @@ def run_cli(args: argparse.Namespace):
             require_configs(
                 cfg,
                 ["feature_dir","wsi_dir","model_path","output_dir", "n_toptiles", "overview"], 
-                prefix="heatmaps",
-                paths_to_check=["feature_dir","wsi_dir","model_path"]
+                prefix="heatmaps"
             )
             c = cfg.heatmaps
             from .heatmaps.__main__ import main
@@ -266,7 +337,7 @@ def run_cli(args: argparse.Namespace):
 
 def main() -> None:
     parser = argparse.ArgumentParser(prog="stamp", description="STAMP: Solid Tumor Associative Modeling in Pathology")
-    parser.add_argument("--config", "-c", type=Path, default=None, help=f"Path to config file. Note that the --config option must be supplied before any of the subcommands. If unspecified, defaults to {DEFAULT_CONFIG_FILE.absolute()} or the default STAMP config file shipped with the package if {DEFAULT_CONFIG_FILE.absolute()} does not exist.")
+    parser.add_argument("--config", "-c", type=Path, default=None, help=f"Path to config file (if unspecified, defaults to {DEFAULT_CONFIG_FILE.absolute()} or the default STAMP config file shipped with the package if {DEFAULT_CONFIG_FILE.absolute()} does not exist)")
 
     commands = parser.add_subparsers(dest="command")
     commands.add_parser("init", help="Create a new STAMP configuration file at the path specified by --config")
