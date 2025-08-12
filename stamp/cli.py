@@ -172,7 +172,7 @@ def run_cli(args: argparse.Namespace):
                     print("Downloading H-optimus-0 weights")
                     assets_dir = f"{os.environ['STAMP_RESOURCES_DIR']}"
 
-                    model = model = timm.create_model("hf-hub:bioptimus/H-optimus-0", pretrained=True, init_values=1e-5, dynamic_img_size=False)          
+                    model = timm.create_model("hf-hub:bioptimus/H-optimus-0", pretrained=True, init_values=1e-5, dynamic_img_size=False)          
                     model_name = 'hoptimus0'
                     checkpoint = 'pytorch_model.bin'
 
@@ -188,7 +188,7 @@ def run_cli(args: argparse.Namespace):
                     print("Downloading H-optimus-1 weights")
                     assets_dir = f"{os.environ['STAMP_RESOURCES_DIR']}"
 
-                    model = model = timm.create_model("hf-hub:bioptimus/H-optimus-1", pretrained=True, init_values=1e-5, dynamic_img_size=False)          
+                    model = timm.create_model("hf-hub:bioptimus/H-optimus-1", pretrained=True, init_values=1e-5, dynamic_img_size=False)          
                     model_name = 'hoptimus1'
                     checkpoint = 'pytorch_model.bin'
 
