@@ -22,7 +22,7 @@ modeling:
   clini_table: ./results/metadata_HE/clini_table_disease_all_berlin.csv # Path to clini_table file (.xlsx or .csv)
   slide_table: ./results/metadata_HE/slide.csv # Path to slide_table file (.xlsx or .csv)
   feature_dir: ${preprocessing.output_dir}/STAMP_macenko_virchow2 # Path to feature directory
-  output_dir: ./results/IBD_classifier_Virchow2_all_tissue/all_tissue # Path to output directory
+  output_dir: ./results/IBD_classifier_Virchow2/all_tissue # Path to output directory
   target_label: disease # Target label. No spaces allowed! Format clinical table accordingly
   categories: [] # Categories (list), leave empty to automatically infer based on unique values in the target_label column
   cat_labels: [] # Extra input category labels (list, can be empty)
